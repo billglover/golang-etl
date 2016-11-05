@@ -27,6 +27,12 @@ head dest.txt
 
 **Time taken:** 19.66s
 
+## Version-2
+
+This version uses one Go routine for each of the three stages; extract, transform and load. This shaves a little time off the overall processing but isn't a dramatic improvement. If we think about it, each Go routine includes a simulated delay for processing each record. The Go routine is tied up waiting for each of these delays to comlete sequentially. It is these delays that make up the bulk of our processing time.
+
+**Time taken:** 13.66s
+
 ## Credit
 
 Source: [Go Concurrent Programming](http://www.pluralsight.com/courses/go-concurrent-programming)
