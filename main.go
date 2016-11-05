@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -74,13 +75,19 @@ func transform(eChan, tChan chan *Order) {
 		productList[p.PartNumber] = p
 	}
 
+	var wg sync.WaitGroup
 	for o := range eChan {
-		time.Sleep(3 * time.Millisecond)
-		o.UnitCost = productList[o.PartNumber].UnitCost
-		o.UnitPrice = productList[o.PartNumber].UnitPrice
-		tChan <- o
+		wg.Add(1)
+		go func(o *Order) {
+			time.Sleep(3 * time.Millisecond)
+			o.UnitCost = productList[o.PartNumber].UnitCost
+			o.UnitPrice = productList[o.PartNumber].UnitPrice
+			tChan <- o
+			defer wg.Done()
+		}(o)
 	}
 
+	wg.Wait()
 	close(tChan)
 
 }
@@ -92,12 +99,18 @@ func load(tChan chan *Order, done chan bool) {
 	fmt.Fprintf(f, "%20s%16s%13s%13s%16s%16s", "Part Number", "Quantity",
 		"Unit Cost", "Unit Price", "Total Cost", "Total Price\n")
 
+	var wg sync.WaitGroup
 	for o := range tChan {
-		time.Sleep(1 * time.Millisecond)
-		fmt.Fprintf(f, "%20s %15d %12.2f %12.2f %15.2f%15.2f\n",
-			o.PartNumber, o.Quantity, o.UnitCost, o.UnitPrice,
-			o.UnitCost*float64(o.Quantity), o.UnitPrice*float64(o.UnitPrice))
+		wg.Add(1)
+		go func(o *Order) {
+			time.Sleep(1 * time.Millisecond)
+			fmt.Fprintf(f, "%20s %15d %12.2f %12.2f %15.2f%15.2f\n",
+				o.PartNumber, o.Quantity, o.UnitCost, o.UnitPrice,
+				o.UnitCost*float64(o.Quantity), o.UnitPrice*float64(o.UnitPrice))
+			defer wg.Done()
+		}(o)
 	}
 
+	wg.Wait()
 	done <- true
 }
