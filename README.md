@@ -33,6 +33,12 @@ This version uses one Go routine for each of the three stages; extract, transfor
 
 **Time taken:** 13.66s
 
+## Version-3
+
+This version uses a single Go routine for each transform and load operation. Remember, this is still using a single processor for execution. The improvements in execution time are realised because each of the transform and load operations is processed concurrently.
+
+**Time taken:** 71.81ms
+
 ## Credit
 
 Source: [Go Concurrent Programming](http://www.pluralsight.com/courses/go-concurrent-programming)
