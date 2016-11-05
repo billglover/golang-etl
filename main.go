@@ -10,9 +10,16 @@ import (
 
 func main() {
 	start := time.Now()
-	orders := extract()
-	orders = transform(orders)
-	load(orders)
+
+	eChan := make(chan *Order)
+	tChan := make(chan *Order)
+	done := make(chan bool)
+
+	go extract(eChan)
+	go transform(eChan, tChan)
+	go load(tChan, done)
+
+	<-done
 	fmt.Println(time.Since(start))
 }
 
@@ -33,9 +40,7 @@ type Order struct {
 	UnitPrice float64
 }
 
-func extract() []*Order {
-	result := []*Order{}
-
+func extract(eChan chan *Order) {
 	f, _ := os.Open("./orders.txt")
 	defer f.Close()
 
@@ -46,13 +51,14 @@ func extract() []*Order {
 		o.CustomerNumber, _ = strconv.Atoi(record[0])
 		o.PartNumber = record[1]
 		o.Quantity, _ = strconv.Atoi(record[2])
-		result = append(result, o)
+
+		eChan <- o
 	}
 
-	return result
+	close(eChan)
 }
 
-func transform(orders []*Order) []*Order {
+func transform(eChan, tChan chan *Order) {
 	f, _ := os.Open("./productList.txt")
 	defer f.Close()
 
@@ -68,28 +74,30 @@ func transform(orders []*Order) []*Order {
 		productList[p.PartNumber] = p
 	}
 
-	for idx := range orders {
+	for o := range eChan {
 		time.Sleep(3 * time.Millisecond)
-		o := orders[idx]
 		o.UnitCost = productList[o.PartNumber].UnitCost
 		o.UnitPrice = productList[o.PartNumber].UnitPrice
+		tChan <- o
 	}
 
-	return orders
+	close(tChan)
 
 }
 
-func load(orders []*Order) {
+func load(tChan chan *Order, done chan bool) {
 	f, _ := os.Create("./dest.txt")
 	defer f.Close()
 
 	fmt.Fprintf(f, "%20s%16s%13s%13s%16s%16s", "Part Number", "Quantity",
 		"Unit Cost", "Unit Price", "Total Cost", "Total Price\n")
 
-	for _, o := range orders {
+	for o := range tChan {
 		time.Sleep(1 * time.Millisecond)
 		fmt.Fprintf(f, "%20s %15d %12.2f %12.2f %15.2f%15.2f\n",
 			o.PartNumber, o.Quantity, o.UnitCost, o.UnitPrice,
 			o.UnitCost*float64(o.Quantity), o.UnitPrice*float64(o.UnitPrice))
 	}
+
+	done <- true
 }
